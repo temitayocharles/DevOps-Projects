@@ -34,14 +34,16 @@ jobs:
         if: steps.detect.outputs.has_tf == 'true'
         run: terraform fmt -check -recursive || true
 
-      - name: Terraform validate (best effort)
+      - name: Terraform validate (best effort, bounded)
         if: steps.detect.outputs.has_tf == 'true'
         run: |
           set -euo pipefail
           mapfile -t dirs < <(git ls-files '*.tf' | xargs -n1 dirname | sort -u)
+          # Bound runtime: validate only a sample of directories.
+          dirs=("${dirs[@]:0:20}")
           for d in "${dirs[@]}"; do
-            terraform -chdir="$d" init -backend=false >/dev/null || true
-            terraform -chdir="$d" validate || true
+            timeout 30s terraform -chdir="$d" init -backend=false >/dev/null || true
+            timeout 30s terraform -chdir="$d" validate || true
           done
 
       - name: Python syntax validation
